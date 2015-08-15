@@ -1,4 +1,4 @@
-organization := "com.mao.zhehao"
+organization := "org.soundkit"
 
 version := "1.0"
 
@@ -10,4 +10,4 @@ libraryDependencies +=
   ("edu.berkeley.cs" %% "chisel" % System.getProperty("chiselVersion", ""))
 
 libraryDependencies +=
-  ("com.mao.zhehao" %% "codec" % System.getProperty("codecVersion", ""))
+  ("org.soundkit" %% "codec" % System.getProperty("codecVersion", ""))
