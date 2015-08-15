@@ -6,8 +6,6 @@ name := "soundkit"
 
 scalaVersion := "2.11.6"
 
-libraryDependencies +=
-  ("edu.berkeley.cs" %% "chisel" % System.getProperty("chiselVersion", ""))
-
-libraryDependencies +=
-  ("org.soundkit" %% "codec" % System.getProperty("codecVersion", ""))
+libraryDependencies ++= Seq(
+  ("edu.berkeley.cs" %% "chisel" % "2.3-SNAPSHOT"),
+  ("edu.berkeley.cs" %% "hardfloat" % "1.2"))
