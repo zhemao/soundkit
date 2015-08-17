@@ -33,7 +33,7 @@ class AudioStreamIO extends AudioBundle {
 
 class Codec extends AudioModule {
   val io = new Bundle {
-    val streams = Vec(new AudioStreamIO(), audioNChannels).flip
+    val stream = new AudioStreamIO().flip
     val aud = new AudioIO
   }
 
@@ -61,35 +61,28 @@ class Codec extends AudioModule {
     shift_in := Cat(shift_in(audioSampleWidth - 2, 0), io.aud.adcdat)
   }
 
-  for (channel <- 0 until audioNChannels) {
-    val stream = io.streams(channel)
-    val set_capture_valid = Wire(init = Bool(false))
-    val last_capture_bit = lrck_count === UInt(audioSampleWidth - 1)
-    val capture_valid = Reg(init = Bool(false))
+  val set_capture_valid = Wire(init = Bool(false))
+  val last_capture_bit = lrck_count === UInt(audioSampleWidth - 1)
+  val capture_valid = Reg(init = Bool(false))
 
-    stream.in.valid := capture_valid
-    stream.in.bits := shift_in
+  io.stream.in.valid := capture_valid
+  io.stream.in.bits := shift_in
 
-    if (channel == 0) {
-      stream.out.ready := lrck_switch && !lrck
-      set_capture_valid := set_bclk && last_capture_bit && lrck
-    } else {
-      stream.out.ready := lrck_switch && lrck
-      set_capture_valid := set_bclk && last_capture_bit && !lrck
-    }
-
-    when (set_capture_valid) { capture_valid := Bool(true) }
-    when (stream.in.fire() || lrck_switch) { capture_valid := Bool(false) }
-
-    when (stream.out.fire()) { shift_out := stream.out.bits }
-  }
-
-  if (!stereoAudio) {
+  if (stereoAudio) {
+    io.stream.out.ready := lrck_switch
+    set_capture_valid := set_bclk && last_capture_bit
+  } else {
+    io.stream.out.ready := lrck_switch && !lrck
+    set_capture_valid := set_bclk && last_capture_bit && lrck
     val saved_sample = Reg(init = UInt(0, audioSampleWidth))
-    val stream = io.streams.head
-    when (stream.out.fire()) { saved_sample := stream.out.bits }
+    when (io.stream.out.fire()) { saved_sample := io.stream.out.bits }
     when (lrck_switch && lrck) { shift_out := saved_sample }
   }
+
+  when (set_capture_valid) { capture_valid := Bool(true) }
+  when (io.stream.in.fire() || lrck_switch) { capture_valid := Bool(false) }
+
+  when (io.stream.out.fire()) { shift_out := io.stream.out.bits }
 
   io.aud.bclk := bclk
   io.aud.adclrck := lrck
@@ -102,13 +95,13 @@ class CodecTester(c: Codec) extends Tester(c, false) {
 
   for (_ <- 0 until nTests) {
     val samp = rnd.nextInt(1 << c.audioSampleWidth)
-    poke(c.io.streams(0).out.valid, 1)
-    poke(c.io.streams(0).out.bits, samp)
+    poke(c.io.stream.out.valid, 1)
+    poke(c.io.stream.out.bits, samp)
 
-    while (peek(c.io.streams(0).out.ready) == 0) { step(1) }
+    while (peek(c.io.stream.out.ready) == 0) { step(1) }
 
     step(1)
-    poke(c.io.streams(0).out.valid, 0)
+    poke(c.io.stream.out.valid, 0)
 
     var word = BigInt(0)
 
@@ -122,9 +115,9 @@ class CodecTester(c: Codec) extends Tester(c, false) {
     if (word != samp)
       println(f"expected output $samp%x, got $word%x")
 
-    while (peek(c.io.streams(0).in.valid) == 0) { step(1) }
+    while (peek(c.io.stream.in.valid) == 0) { step(1) }
 
-    word = peek(c.io.streams(0).in.bits)
+    word = peek(c.io.stream.in.bits)
     if (word != samp)
       println(f"expected input $samp%x, got $word%x")
   }
